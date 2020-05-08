@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.awt.geom.*;
 import java.io.*;
@@ -27,7 +28,7 @@ public class Watch extends JFrame {
 		setLayout(new BorderLayout());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        setResizable(true);
+        setResizable(false);
         
         // Instantiate layered pane to hold digital/analog representations
         JLayeredPane layeredPane = new JLayeredPane();
@@ -104,19 +105,21 @@ public class Watch extends JFrame {
  */
 class Analog extends JPanel {
 	BufferedImage watchFace = null;
+	BufferedImage chickenImg = null;
 	private int centerX = 220;
 	private int centerY = 225;
 	
+	// Get watch face and chicken images
 	public Analog() throws IOException {
 		File watchFaceFile = new File("watch_face_icon.png");
 		watchFace = ImageIO.read(watchFaceFile);
+		File chickenFile = new File("chicken.png");
+		chickenImg = ImageIO.read(chickenFile);
 	}
 	
 	// Draws second hand
-	private void drawSecond(Graphics g) {
-		// Get time and proper rotation
-		LocalDateTime now = LocalDateTime.now();
-		double second = (double)now.getSecond();
+	private void drawSecond(Graphics g, double second) {
+		// Get proper rotation
 		double angle = second/60.0*2.0*Math.PI;
 		
 		// Create rotation
@@ -133,12 +136,28 @@ class Analog extends JPanel {
 		g2.draw(secHand);
 	}
 	
+	// Draw chicken
+	private void drawChicken(Graphics g, double second) {
+		Graphics2D g2 = (Graphics2D) g;
+		
+		// Flip chicken on half minute to "make it dance"
+		if (second == 30.0 || second == 0.0) {
+			AffineTransform tx = AffineTransform.getScaleInstance(-1, 1);
+			tx.translate(-chickenImg.getWidth(null), 0);
+			AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+			BufferedImage chickenImgFlip = op.filter(chickenImg, null);
+			g2.drawImage(chickenImgFlip, 200, 300, null);
+		}
+		else {
+			g2.drawImage(chickenImg, 200, 300, null);
+		}
+	}
+	
 	// Draws minute hand
-	private void drawMinute(Graphics g) {
-		// Get time and proper rotation
-		LocalDateTime now = LocalDateTime.now();
-		double minute = (double)now.getMinute() + (double)now.getSecond() / 60.0;
-		double angle = minute/60.0*2.0*Math.PI;
+	private void drawMinute(Graphics g, double minute, double second) {
+		// Get proper rotation
+		double minuteCalc = minute + second / 60.0;
+		double angle = minuteCalc/60.0*2.0*Math.PI;
 		
 		// Create rotation
 		AffineTransform af = new AffineTransform();
@@ -155,11 +174,10 @@ class Analog extends JPanel {
 	}
 	
 	// Draws hour hand
-	private void drawHour(Graphics g) {
-		// Get time and proper rotation
-		LocalDateTime now = LocalDateTime.now();
-		double hour = (double)now.getHour() % 12 + (double)now.getMinute() / 60.0;
-		double angle = hour/12.0*2.0*Math.PI;
+	private void drawHour(Graphics g, double hour, double minute) {
+		// Get proper rotation
+		double hourCalc = hour % 12 + minute / 60.0;
+		double angle = hourCalc/12.0*2.0*Math.PI;
 		
 		// Create rotation
 		AffineTransform af = new AffineTransform();
@@ -184,10 +202,19 @@ class Analog extends JPanel {
 	@Override
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
+		
+		// Get Time info to pass to functions
+		LocalDateTime now = LocalDateTime.now();
+		double second = (double)now.getSecond();
+		double minute = (double)now.getMinute();
+		double hour = (double)now.getHour();
+		
+		// Draw components
 		drawFace(g);
-		drawSecond(g);
-		drawMinute(g);
-		drawHour(g);
+		drawChicken(g, second);
+		drawSecond(g, second);
+		drawMinute(g, minute, second);
+		drawHour(g, hour, minute);
 	}
 }
 
